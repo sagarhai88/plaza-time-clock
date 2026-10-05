@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0f5c6e">
+<title>Plaza Latina Time Clock</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#f3f1ec; --surface:#ffffff; --fg:#1d1b17; --muted:#6b665c; --line:#dcd7cc;
+  --accent:#0f5c6e; --accent-fg:#ffffff; --accent-soft:#dcecef;
+  --in:#1f7a3f; --in-soft:#dff0e3; --out:#8a4b12; --out-soft:#f6e6d4; --bad:#a9321f; --bad-soft:#f7dfda;
+  --display:"Barlow Semi Condensed","Arial Narrow",Arial,sans-serif;
+  --body:"Barlow","Helvetica Neue",Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#17191c; --surface:#22252a; --fg:#ebe8e1; --muted:#9a968d; --line:#373b42;
+  --accent:#5fb9cc; --accent-fg:#0d2a31; --accent-soft:#1c3b43;
+  --in:#5ccf85; --in-soft:#1b3a27; --out:#e8a65c; --out-soft:#3d2a14; --bad:#f08a7a; --bad-soft:#44201a;
+  color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;line-height:1.4;padding-inline:16px;padding-block:calc(16px + env(safe-area-inset-top,0px)) calc(32px + env(safe-area-inset-bottom,0px))}
+.wrap{max-width:480px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+h1{font-family:var(--display);font-weight:700;font-size:22px;margin:0;line-height:1.1}
+.sub{color:var(--muted);font-size:13px;margin-top:2px}
+.now{text-align:right}
+.now .t{font-family:var(--display);font-size:34px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.now .d{color:var(--muted);font-size:13px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px}
+h2{font-family:var(--display);font-size:18px;font-weight:600;margin:0 0 10px}
+.lbl{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.dots{display:flex;justify-content:center;gap:14px;margin:14px 0 18px}
+.dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--accent);background:transparent}
+.dot.on{background:var(--accent)}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.pad button{font-family:var(--display);font-size:26px;font-weight:600;padding:16px 0;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--fg);cursor:pointer}
+.pad button:active{background:var(--accent-soft)}
+.pad button.alt{font-family:var(--body);font-size:14px;font-weight:600;color:var(--muted)}
+.pad button:disabled{opacity:.5}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.msg{min-height:22px;text-align:center;color:var(--muted);font-size:14px}
+.msg.err{color:var(--bad)}
+.who{text-align:center}
+.who .name{font-family:var(--display);font-size:30px;font-weight:700;line-height:1.1}
+.who .state{margin:6px 0 16px;font-size:15px;color:var(--muted)}
+.timer{margin:0 0 16px}
+.timer .t{font-family:var(--display);font-size:44px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums;color:var(--in)}
+.confirm .check{width:64px;height:64px;border-radius:50%;background:var(--in);color:#fff;font-size:36px;font-weight:700;line-height:64px;margin:4px auto 10px}
+.confirm .state{font-size:17px;color:var(--fg)}
+.pill{display:inline-block;padding:3px 10px;border-radius:999px;font-size:13px;font-weight:600}
+.pill.in{background:var(--in-soft);color:var(--in)}
+.pill.out{background:var(--out-soft);color:var(--out)}
+.pill.bad{background:var(--bad-soft);color:var(--bad)}
+.big{width:100%;font-family:var(--display);font-size:24px;font-weight:700;padding:18px;border-radius:12px;border:0;cursor:pointer;color:#fff}
+.big.in{background:var(--in)}
+.big.out{background:var(--out)}
+.big:disabled{opacity:.5;cursor:default}
+.link{background:none;border:0;color:var(--accent);font:inherit;font-weight:600;cursor:pointer;padding:8px}
+.btn{font:inherit;font-weight:600;padding:9px 14px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--fg);cursor:pointer}
+.btn.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.btn.danger{color:var(--bad)}
+.btn.sm{padding:5px 10px;font-size:13px}
+.btn:disabled{opacity:.5}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row.between{justify-content:space-between}
+.roster{display:flex;flex-direction:column}
+.roster .r{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--line)}
+.roster .r:first-child{border-top:0}
+.roster .since{color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
+.empty{color:var(--muted);font-size:14px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:14px;overflow-x:auto}
+.tabs button{background:none;border:0;border-bottom:2px solid transparent;padding:8px 10px;font:inherit;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tabs button.on{color:var(--accent);border-bottom-color:var(--accent)}
+input,select{font:inherit;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--fg);min-width:0;width:100%}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}
+.field label{font-size:12px;color:var(--muted);font-weight:600}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px;font-variant-numeric:tabular-nums}
+th{text-align:left;font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+td.num,th.num{text-align:right}
+tr.tot td{font-weight:700;border-bottom:0}
+.person{padding:10px 0;border-top:1px solid var(--line)}
+.person:first-child{border-top:0}
+.person .name{font-weight:600}
+.person .meta{color:var(--muted);font-size:13px}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:12px 18px;border-radius:12px;font-weight:600;max-width:calc(100% - 32px);text-align:center;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.show{opacity:1}
+.note{font-size:13px;color:var(--muted)}
+.stack{display:flex;flex-direction:column;gap:12px}
+.stack.tight{gap:6px}
+.pe{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media (max-width:420px){.pe{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Plaza Latina Time Clock</h1>
+      <div class="sub">Harry Hines · Dallas</div>
+    </div>
+    <div class="now"><div class="t" id="clockT">--:--</div><div class="d" id="clockD"></div></div>
+  </header>
+
+  <section class="card" id="punch">
+    <div id="padView">
+      <div class="lbl" style="text-align:center">Enter your PIN</div>
+      <div class="dots" id="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+      <div class="pad" id="pad">
+        <button type="button" data-k="1">1</button><button type="button" data-k="2">2</button><button type="button" data-k="3">3</button>
+        <button type="button" data-k="4">4</button><button type="button" data-k="5">5</button><button type="button" data-k="6">6</button>
+        <button type="button" data-k="7">7</button><button type="button" data-k="8">8</button><button type="button" data-k="9">9</button>
+        <button type="button" class="alt" data-k="clear">Clear</button><button type="button" data-k="0">0</button><button type="button" class="alt" data-k="back">⌫</button>
+      </div>
+      <div class="msg" id="padMsg" style="margin-top:12px">Loading…</div>
+    </div>
+    <div id="whoView" hidden>
+      <div class="who">
+        <div class="name" id="whoName"></div>
+        <div class="state" id="whoState"></div>
+        <div class="timer" id="whoTimer" hidden><div class="lbl">Time on the clock</div><div class="t">0h 00m</div></div>
+        <button type="button" class="big in" id="punchBtn">Clock In</button>
+        <div style="margin-top:8px"><button type="button" class="link" id="notMe">Not you? Go back</button></div>
+      </div>
+    </div>
+    <div id="confirmView" hidden>
+      <div class="who confirm">
+        <div class="check" aria-hidden="true">✓</div>
+        <div class="name">Confirmed</div>
+        <div class="state" id="confirmText"></div>
+        <button type="button" class="link" id="confirmDone">Done</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="rosterCard">
+    <div class="row between"><h2 style="margin:0">On the clock now</h2><span class="note" id="rosterCount"></span></div>
+    <div class="roster" id="roster" style="margin-top:10px"><div class="empty">Nobody is clocked in.</div></div>
+  </section>
+
+  <div style="text-align:center"><button type="button" class="link" id="mgrBtn">Manager</button></div>
+
+  <section class="card" id="mgr" hidden>
+    <div id="mgrLogin">
+      <div class="row between" style="margin-bottom:8px"><h2 style="margin:0">Manager sign in</h2><button type="button" class="btn sm" id="mgrCancel">Cancel</button></div>
+      <form class="stack tight" id="mgrForm">
+        <div class="field"><label for="mEmail">Email</label><input type="email" id="mEmail" autocomplete="username"></div>
+        <div class="field"><label for="mPass">Password</label><input type="password" id="mPass" autocomplete="current-password"></div>
+        <div class="row"><button type="submit" class="btn primary" id="mgrSignIn">Sign in</button></div>
+        <div class="msg err" id="mgrMsg"></div>
+      </form>
+    </div>
+    <div id="mgrPanel" hidden>
+      <div class="row between" style="margin-bottom:8px"><h2 style="margin:0">Manager</h2><div class="row"><button type="button" class="btn sm" id="mgrSignOut">Sign out</button><button type="button" class="btn sm" id="mgrClose">Close</button></div></div>
+      <div class="tabs">
+        <button type="button" data-tab="hours" class="on">Hours</button>
+        <button type="button" data-tab="punches">Punches</button>
+        <button type="button" data-tab="people">People</button>
+      </div>
+
+      <div id="tab-hours" class="stack">
+        <div class="row between">
+          <button type="button" class="btn sm" id="prevP">‹ Prev</button>
+          <div style="text-align:center"><div class="lbl">Pay period</div><div id="periodLbl" style="font-weight:600"></div></div>
+          <button type="button" class="btn sm" id="nextP">Next ›</button>
+        </div>
+        <div class="tbl"><table id="hoursTbl"><thead><tr><th>Person</th><th class="num">Days</th><th class="num">Hours</th></tr></thead><tbody></tbody></table></div>
+        <div class="note" id="hoursNote"></div>
+        <div class="row"><button type="button" class="btn" id="copySummary">Copy summary</button></div>
+      </div>
+
+      <div id="tab-punches" class="stack" hidden>
+        <div class="note">Punches in the selected pay period (change the period on the Hours tab). Times are in this device's time zone.</div>
+        <div class="tbl"><table id="punchTbl"><thead><tr><th>Person</th><th>Day</th><th>In</th><th>Out</th><th class="num">Hrs</th><th></th></tr></thead><tbody></tbody></table></div>
+        <div class="card" style="padding:14px" id="editBox" hidden>
+          <div class="lbl" id="editTitle">Edit punch</div>
+          <div class="stack tight" style="margin-top:8px">
+            <div class="field" id="editPersonWrap"><label for="editPerson">Person</label><select id="editPerson"></select></div>
+            <div class="pe">
+              <div class="field"><label for="editIn">Clock in</label><input type="datetime-local" id="editIn"></div>
+              <div class="field"><label for="editOut">Clock out (blank = still in)</label><input type="datetime-local" id="editOut"></div>
+            </div>
+            <div class="field"><label for="editNote">Reason for change</label><input type="text" id="editNote" placeholder="e.g. forgot to clock out"></div>
+            <div class="row between"><div class="row"><button type="button" class="btn primary" id="editSave">Save</button><button type="button" class="btn" id="editCancel">Cancel</button></div><button type="button" class="btn danger" id="editDelete">Delete</button></div>
+            <div class="msg err" id="editMsg"></div>
+          </div>
+        </div>
+        <div class="row"><button type="button" class="btn" id="addPunch">Add a missed punch</button></div>
+      </div>
+
+      <div id="tab-people" class="stack" hidden>
+        <div id="peopleList"></div>
+        <div class="card" style="padding:14px">
+          <div class="lbl" id="pTitle">Add a person</div>
+          <div class="stack tight" style="margin-top:8px">
+            <div class="field"><label for="pName">Name</label><input type="text" id="pName" placeholder="First and last name"></div>
+            <div class="pe">
+              <div class="field"><label for="pRole">Type</label><select id="pRole"><option value="employee">Employee</option><option value="staff">Staff</option><option value="vendor">Vendor</option></select></div>
+              <div class="field"><label for="pPin">4-digit PIN</label><input type="text" id="pPin" inputmode="numeric" maxlength="4"></div>
+            </div>
+            <div class="row"><button type="button" class="btn primary" id="pSave">Save</button><button type="button" class="btn" id="pCancel" hidden>Cancel</button></div>
+            <div class="msg err" id="pMsg"></div>
+            <div class="note" id="pHint">To change someone's PIN, edit them and enter the new PIN. Their past hours stay with their name.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <div class="note" style="text-align:center">Pay periods: two weeks, Monday–Sunday, from <span id="anchorLbl"></span>.</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script>
+// ======== SETUP: paste your Firebase web app config here (Firebase console → Project settings → Your apps) ========
+const firebaseConfig = {
+  apiKey: "AIzaSyCUA_AanxsDZnLWfpB839MYxQrDHvN3oxI",
+  authDomain: "plaza-time-clock.firebaseapp.com",
+  projectId: "plaza-time-clock",
+  appId: "1:329038037167:web:80e38409407b0cb03f945a"
+};
+const MANAGER_EMAIL = "sagar.hemani@gmail.com";   // the manager account you create in Firebase Authentication
+const PERIOD_ANCHOR = "2026-10-05";               // first Monday of the first two-week pay period
+const PIN_DOMAIN = "pin.plazalatina.clock";       // internal only; workers never see this
+// =================================================================================================================
+
+(function(){
+  const $=id=>document.getElementById(id);
+  const FORGOT_HOURS=16;
+  if(firebaseConfig.apiKey.startsWith('PASTE')){$('padMsg').textContent='Setup needed: paste the Firebase config into index.html.';$('padMsg').className='msg err';return}
+  firebase.initializeApp(firebaseConfig);
+  const auth=firebase.auth(), db=firebase.firestore();
+  const TS=firebase.firestore.Timestamp, FV=firebase.firestore.FieldValue;
+  let people={}, punches={};
+  let pin='', current=null, idleTimer=null, periodOffset=0, editingId=null, editingPerson=null;
+  let unsubPeople=null, unsubPunches=null, isManager=false;
+
+  // ---------- helpers ----------
+  async function sha(s){const h=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return [...new Uint8Array(h)].map(x=>x.toString(16).padStart(2,'0')).join('')}
+  async function pinCreds(p){const h=await sha('plaza-latina-pin:'+p);return {email:'p'+h.slice(0,20)+'@'+PIN_DOMAIN,password:'K'+h.slice(20,52)}}
+  const pad2=n=>String(n).padStart(2,'0');
+  const toDate=v=>v&&v.toDate?v.toDate():(v?new Date(v):null);
+  function localDay(d){return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate())}
+  function parseDay(s){const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)}
+  function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x}
+  function fmtT(d){return d.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}
+  function fmtDayD(d){return d.toLocaleDateString([], {weekday:'short',month:'short',day:'numeric'})}
+  function fmtDate(d){return d.toLocaleDateString([], {month:'short',day:'numeric'})}
+  function toLocalInput(d){if(!d)return '';return localDay(d)+'T'+pad2(d.getHours())+':'+pad2(d.getMinutes())}
+  function fromLocalInput(v){return v?new Date(v):null}
+  function hrs(p){const a=toDate(p.inAt)||new Date();const b=toDate(p.outAt)||new Date();return (b-a)/36e5}
+  function forgot(p){return !p.outAt && hrs(p)>FORGOT_HOURS}
+  function fmtDur(h){const m=Math.max(0,Math.floor(h*60));return Math.floor(m/60)+'h '+pad2(m%60)+'m'}
+  function dayOf(p){const d=toDate(p.inAt);return d?localDay(d):''}
+  function toast(t){const e=$('toast');e.textContent=t;e.classList.add('show');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('show'),2800)}
+  function period(offset){
+    const anchor=parseDay(PERIOD_ANCHOR);const today=parseDay(localDay(new Date()));
+    const idx=Math.floor(Math.round((today-anchor)/864e5)/14)+offset;
+    const start=addDays(anchor,idx*14);const end=addDays(start,13);
+    return {start:localDay(start),end:localDay(end),startD:start,endD:end};
+  }
+  $('anchorLbl').textContent=parseDay(PERIOD_ANCHOR).toLocaleDateString([], {month:'long',day:'numeric',year:'numeric'});
+
+  // ---------- clock ----------
+  function tick(){const n=new Date();$('clockT').textContent=fmtT(n);$('clockD').textContent=n.toLocaleDateString([], {weekday:'long',month:'long',day:'numeric'});
+    if(current){const open=openPunchFor(current.id);if(open)$('whoTimer').querySelector('.t').textContent=fmtDur(hrs(open))}}
+  tick();setInterval(tick,1000);
+
+  // ---------- auth + data ----------
+  function ensureSubscriptions(){
+    if(unsubPeople)return;
+    unsubPeople=db.collection('people').onSnapshot(s=>{people={};s.forEach(d=>people[d.id]={id:d.id,...d.data()});renderRoster();if(!$('mgrPanel').hidden)renderMgr();
+      if($('padMsg').textContent==='Loading…')$('padMsg').textContent=Object.keys(people).length?'':'No one is set up yet. Tap Manager to add people.'},e=>console.error(e));
+    const since=TS.fromDate(addDays(new Date(),-60));
+    unsubPunches=db.collection('punches').where('inAt','>=',since).onSnapshot(s=>{punches={};s.forEach(d=>punches[d.id]={id:d.id,...d.data()});renderRoster();if(current)showWho(current);if(!$('mgrPanel').hidden)renderMgr()},e=>console.error(e));
+  }
+  auth.onAuthStateChanged(u=>{
+    if(!u){auth.signInAnonymously().catch(e=>{console.error(e);$('padMsg').textContent='Could not connect. Check the internet connection.';$('padMsg').className='msg err'});return}
+    isManager=!!u.email&&u.email.toLowerCase()===MANAGER_EMAIL.toLowerCase();
+    ensureSubscriptions();
+    if(isManager){$('mgrLogin').hidden=true;$('mgrPanel').hidden=false;renderMgr()}
+    else{$('mgrPanel').hidden=true;$('mgrLogin').hidden=false}
+  });
+
+  // ---------- PIN pad ----------
+  function renderDots(val){[...$('dots').children].forEach((d,i)=>d.classList.toggle('on',i<val.length))}
+  let busy=false;
+  $('pad').addEventListener('click',async e=>{
+    const k=e.target.dataset.k;if(!k||busy)return;
+    if(k==='clear')pin='';else if(k==='back')pin=pin.slice(0,-1);else if(pin.length<4)pin+=k;
+    renderDots(pin);$('padMsg').textContent='';$('padMsg').className='msg';
+    if(pin.length===4){
+      busy=true;const entered=pin;pin='';
+      try{
+        const c=await pinCreds(entered);
+        const cred=await auth.signInWithEmailAndPassword(c.email,c.password);
+        const snap=await db.doc('people/'+cred.user.uid).get();
+        if(!snap.exists||snap.data().active===false){throw new Error('inactive')}
+        renderDots('');showWho({id:snap.id,...snap.data()});
+      }catch(err){
+        renderDots('');
+        const code=err.code||err.message;
+        $('padMsg').className='msg err';
+        $('padMsg').textContent=(code==='auth/too-many-requests')?'Too many tries. Wait a minute and try again.':(code==='inactive'?'This PIN is no longer active. See the manager.':'PIN not recognized. Try again.');
+        if(!auth.currentUser)auth.signInAnonymously().catch(()=>{});
+      }finally{busy=false}
+    }
+  });
+
+  // ---------- punching ----------
+  function openPunchFor(pid){return Object.values(punches).find(p=>p.personId===pid&&!p.outAt&&!forgot(p))}
+  function showWho(p){
+    current=p;$('padView').hidden=true;$('confirmView').hidden=true;$('whoView').hidden=false;
+    $('whoName').textContent=p.name;
+    const open=openPunchFor(p.id);const stale=Object.values(punches).find(x=>x.personId===p.id&&!x.outAt&&forgot(x));
+    const btn=$('punchBtn');
+    if(open){$('whoState').innerHTML='<span class="pill in">Clocked in</span> at '+fmtT(toDate(open.inAt));$('whoTimer').querySelector('.t').textContent=fmtDur(hrs(open));$('whoTimer').hidden=false;btn.textContent='Clock Out';btn.className='big out'}
+    else{$('whoState').innerHTML=(stale?'<span class="pill bad">Missed clock-out on '+fmtDayD(toDate(stale.inAt))+'</span> tell the manager. ':'')+'<span class="pill out">Clocked out</span>';$('whoTimer').hidden=true;btn.textContent='Clock In';btn.className='big in'}
+    btn.disabled=false;resetIdle();
+  }
+  function backToPad(){current=null;$('whoView').hidden=true;$('confirmView').hidden=true;$('padView').hidden=false;clearTimeout(idleTimer)}
+  function resetIdle(){clearTimeout(idleTimer);idleTimer=setTimeout(backToPad,25000)}
+  function showConfirm(text){current=null;$('whoView').hidden=true;$('confirmText').textContent=text;$('confirmView').hidden=false;clearTimeout(idleTimer);idleTimer=setTimeout(backToPad,3000)}
+  $('notMe').onclick=backToPad;
+  $('confirmDone').onclick=backToPad;
+  $('punchBtn').onclick=async()=>{
+    if(!current)return;const btn=$('punchBtn');btn.disabled=true;
+    try{
+      const open=openPunchFor(current.id);const now=new Date();
+      if(open){await db.doc('punches/'+open.id).update({outAt:FV.serverTimestamp()});showConfirm(current.name+' clocked out at '+fmtT(now)+'. Shift: '+fmtDur((now-toDate(open.inAt))/36e5)+'.')}
+      else{await db.collection('punches').add({personId:current.id,inAt:FV.serverTimestamp(),outAt:null,note:''});showConfirm(current.name+' clocked in at '+fmtT(now)+'. Enter your PIN again when you leave to clock out.')}
+    }catch(e){console.error(e);$('whoState').innerHTML='<span class="pill bad">Could not save. Check the connection and try again.</span>';btn.disabled=false}
+  };
+
+  // ---------- roster ----------
+  function renderRoster(){
+    const open=Object.values(punches).filter(p=>!p.outAt&&!forgot(p)&&p.inAt).sort((a,b)=>toDate(a.inAt)-toDate(b.inAt));
+    const el=$('roster');el.innerHTML='';$('rosterCount').textContent=open.length?open.length+' in':'';
+    if(!open.length){el.innerHTML='<div class="empty">Nobody is clocked in.</div>';return}
+    for(const p of open){const d=document.createElement('div');d.className='r';d.innerHTML='<span class="name"></span><span class="since">'+fmtDur(hrs(p))+' · in at '+fmtT(toDate(p.inAt))+'</span>';d.firstChild.textContent=(people[p.personId]||{}).name||'Unknown';el.appendChild(d)}
+  }
+  setInterval(()=>{renderRoster();if(!$('mgrPanel').hidden)renderMgr()},30000);
+
+  // ---------- manager ----------
+  $('mgrBtn').onclick=()=>{$('mgr').hidden=false;$('mgr').scrollIntoView({behavior:'smooth'})};
+  $('mgrCancel').onclick=()=>{$('mgr').hidden=true};
+  $('mgrClose').onclick=()=>{$('mgr').hidden=true};
+  $('mgrSignOut').onclick=async()=>{await auth.signOut();$('mgr').hidden=true;toast('Signed out')};
+  $('mgrForm').onsubmit=async e=>{e.preventDefault();$('mgrMsg').textContent='';$('mgrSignIn').disabled=true;
+    try{const r=await auth.signInWithEmailAndPassword($('mEmail').value.trim(),$('mPass').value);
+      if(!r.user.email||r.user.email.toLowerCase()!==MANAGER_EMAIL.toLowerCase()){await auth.signOut();$('mgrMsg').textContent='That account is not the manager.'}
+      $('mPass').value=''}
+    catch(err){$('mgrMsg').textContent='Sign-in failed. Check the email and password.'}
+    finally{$('mgrSignIn').disabled=false}};
+  document.querySelector('.tabs').addEventListener('click',e=>{const t=e.target.dataset.tab;if(!t)return;document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));['hours','punches','people'].forEach(x=>$('tab-'+x).hidden=x!==t)});
+  $('prevP').onclick=()=>{periodOffset--;renderMgr()};
+  $('nextP').onclick=()=>{periodOffset++;renderMgr()};
+
+  function periodPunches(){const pr=period(periodOffset);return Object.values(punches).filter(p=>p.inAt&&dayOf(p)>=pr.start&&dayOf(p)<=pr.end).sort((a,b)=>toDate(a.inAt)-toDate(b.inAt))}
+  function summarize(){
+    const rows={};
+    for(const p of periodPunches()){const name=(people[p.personId]||{}).name||'Unknown';const r=rows[name]||(rows[name]={hours:0,days:new Set(),flags:0,edits:0});
+      if(forgot(p)){r.flags++;continue}
+      r.hours+=hrs(p);r.days.add(dayOf(p));if(p.note)r.edits++}
+    return Object.entries(rows).map(([name,r])=>({name,hours:r.hours,days:r.days.size,flags:r.flags,edits:r.edits})).sort((a,b)=>a.name.localeCompare(b.name));
+  }
+  function renderMgr(){
+    if(!isManager)return;
+    const pr=period(periodOffset);
+    $('periodLbl').textContent=fmtDate(pr.startD)+' – '+fmtDate(pr.endD)+(periodOffset===0?' (current)':'');
+    const tb=$('hoursTbl').querySelector('tbody');tb.innerHTML='';const sum=summarize();let tot=0;
+    for(const r of sum){tot+=r.hours;const tr=document.createElement('tr');tr.innerHTML='<td></td><td class="num">'+r.days+'</td><td class="num">'+r.hours.toFixed(2)+(r.flags?' <span class="pill bad">'+r.flags+' missed out</span>':'')+(r.edits?' <span class="pill out">'+r.edits+' edited</span>':'')+'</td>';tr.firstChild.textContent=r.name;tb.appendChild(tr)}
+    if(!sum.length)tb.innerHTML='<tr><td colspan="3" class="empty">No punches in this period yet.</td></tr>';
+    else{const tr=document.createElement('tr');tr.className='tot';tr.innerHTML='<td>Total</td><td></td><td class="num">'+tot.toFixed(2)+'</td>';tb.appendChild(tr)}
+    $('hoursNote').textContent='Open shifts count up to now. A shift still open after '+FORGOT_HOURS+' hours is treated as a missed clock-out and is not counted until fixed on the Punches tab.';
+    const pb=$('punchTbl').querySelector('tbody');pb.innerHTML='';
+    for(const p of periodPunches()){const tr=document.createElement('tr');const f=forgot(p);
+      tr.innerHTML='<td></td><td>'+fmtDayD(toDate(p.inAt))+'</td><td>'+fmtT(toDate(p.inAt))+'</td><td>'+(p.outAt?fmtT(toDate(p.outAt)):(f?'<span class="pill bad">missed</span>':'<span class="pill in">in</span>'))+'</td><td class="num">'+(f?'—':hrs(p).toFixed(2))+'</td><td><button type="button" class="btn sm" data-edit="'+p.id+'">Edit</button></td>';
+      tr.firstChild.textContent=((people[p.personId]||{}).name||'Unknown')+(p.note?' *':'');pb.appendChild(tr)}
+    if(!pb.children.length)pb.innerHTML='<tr><td colspan="6" class="empty">No punches in this period.</td></tr>';
+    const pl=$('peopleList');pl.innerHTML='';
+    const list=Object.values(people).filter(p=>!p.replacedBy).sort((a,b)=>a.name.localeCompare(b.name));
+    if(!list.length)pl.innerHTML='<div class="empty">No one added yet. Add your employees, staff and vendors below and give each a 4-digit PIN.</div>';
+    for(const p of list){const d=document.createElement('div');d.className='person row between';d.innerHTML='<div><div class="name"></div><div class="meta">'+({vendor:'Vendor',staff:'Staff'}[p.role]||'Employee')+(p.active===false?' · inactive':'')+'</div></div><div class="row"><button type="button" class="btn sm" data-pedit="'+p.id+'">Edit</button><button type="button" class="btn sm" data-ptoggle="'+p.id+'">'+(p.active===false?'Reactivate':'Deactivate')+'</button></div>';d.querySelector('.name').textContent=p.name;pl.appendChild(d)}
+    const sel=$('editPerson');sel.innerHTML='';for(const p of list.filter(x=>x.active!==false)){const o=document.createElement('option');o.value=p.id;o.textContent=p.name;sel.appendChild(o)}
+  }
+  $('copySummary').onclick=async()=>{
+    const pr=period(periodOffset);const sum=summarize();
+    let t='Plaza Latina hours, '+fmtDate(pr.startD)+' – '+fmtDate(pr.endD)+'\n';let tot=0;
+    for(const r of sum){tot+=r.hours;t+=r.name+': '+r.hours.toFixed(2)+' hrs ('+r.days+' days)'+(r.flags?' – '+r.flags+' missed clock-out':'')+'\n'}
+    t+='Total: '+tot.toFixed(2)+' hrs';
+    try{await navigator.clipboard.writeText(t);toast('Summary copied')}catch(e){toast('Copy blocked on this device')}
+  };
+
+  // punch editing (manager)
+  $('punchTbl').addEventListener('click',e=>{const id=e.target.dataset.edit;if(!id)return;const p=punches[id];editingId=id;$('editTitle').textContent='Edit punch';$('editPersonWrap').hidden=true;$('editIn').value=toLocalInput(toDate(p.inAt));$('editOut').value=toLocalInput(toDate(p.outAt));$('editNote').value=p.note||'';$('editMsg').textContent='';$('editDelete').hidden=false;$('editDelete').textContent='Delete';$('editBox').hidden=false;$('editBox').scrollIntoView({behavior:'smooth',block:'nearest'})});
+  $('addPunch').onclick=()=>{editingId=null;$('editTitle').textContent='Add a missed punch';$('editPersonWrap').hidden=false;$('editIn').value='';$('editOut').value='';$('editNote').value='';$('editMsg').textContent='';$('editDelete').hidden=true;$('editBox').hidden=false};
+  $('editCancel').onclick=()=>{$('editBox').hidden=true};
+  $('editSave').onclick=async()=>{
+    const inD=fromLocalInput($('editIn').value),outD=fromLocalInput($('editOut').value),note=$('editNote').value.trim();
+    if(!inD){$('editMsg').textContent='Clock-in time is required.';return}
+    if(outD&&outD<=inD){$('editMsg').textContent='Clock-out must be after clock-in.';return}
+    if(!note){$('editMsg').textContent='Add a short reason so the change shows in the summary.';return}
+    const data={inAt:TS.fromDate(inD),outAt:outD?TS.fromDate(outD):null,note,editedAt:FV.serverTimestamp()};
+    try{
+      if(editingId)await db.doc('punches/'+editingId).update(data);
+      else{const pid=$('editPerson').value;if(!pid){$('editMsg').textContent='Pick a person.';return}await db.collection('punches').add({personId:pid,...data})}
+      $('editBox').hidden=true;toast('Punch saved')
+    }catch(e){console.error(e);$('editMsg').textContent='Could not save. Are you signed in as the manager?'}
+  };
+  $('editDelete').onclick=async()=>{if(!editingId)return;if($('editDelete').textContent!=='Really delete?'){$('editDelete').textContent='Really delete?';return}try{await db.doc('punches/'+editingId).delete();$('editBox').hidden=true;toast('Punch deleted')}catch(e){$('editMsg').textContent='Could not delete.'}$('editDelete').textContent='Delete'};
+
+  // people (manager). Each PIN is a hidden sign-in; creating one uses a second Firebase app so the manager stays signed in.
+  const secondary=firebase.initializeApp(firebaseConfig,'secondary');const auth2=secondary.auth();
+  async function createPinUser(pinValue){const c=await pinCreds(pinValue);const r=await auth2.createUserWithEmailAndPassword(c.email,c.password);const uid=r.user.uid;await auth2.signOut();return uid}
+  $('peopleList').addEventListener('click',async e=>{
+    const ed=e.target.dataset.pedit,tg=e.target.dataset.ptoggle;
+    if(ed){const p=people[ed];editingPerson=ed;$('pTitle').textContent='Edit '+p.name;$('pName').value=p.name;$('pRole').value=p.role||'employee';$('pPin').value='';$('pPin').placeholder='Leave blank to keep PIN';$('pCancel').hidden=false;$('pMsg').textContent='';$('pName').focus()}
+    if(tg){const p=people[tg];try{await db.doc('people/'+tg).update({active:p.active===false});toast(p.name+(p.active===false?' reactivated':' deactivated'))}catch(err){toast('Could not update')}}
+  });
+  function resetPersonForm(){editingPerson=null;$('pTitle').textContent='Add a person';$('pName').value='';$('pRole').value='employee';$('pPin').value='';$('pPin').placeholder='';$('pCancel').hidden=true;$('pMsg').textContent=''}
+  $('pCancel').onclick=resetPersonForm;
+  $('pSave').onclick=async()=>{
+    const name=$('pName').value.trim(),role=$('pRole').value,pv=$('pPin').value.trim();
+    if(!name){$('pMsg').textContent='Name is required.';return}
+    if((!editingPerson||pv)&&!/^\d{4}$/.test(pv)){$('pMsg').textContent='PIN must be exactly 4 digits.';return}
+    $('pSave').disabled=true;
+    try{
+      if(editingPerson&&!pv){await db.doc('people/'+editingPerson).update({name,role});toast(name+' updated')}
+      else{
+        let uid;
+        try{uid=await createPinUser(pv)}catch(err){if(err.code==='auth/email-already-in-use'){$('pMsg').textContent='That PIN is already in use. Pick a different one.';return}throw err}
+        await db.doc('people/'+uid).set({name,role,active:true,createdAt:FV.serverTimestamp()});
+        if(editingPerson){await db.doc('people/'+editingPerson).update({active:false,replacedBy:uid});
+          // move open or recent punches to the new PIN identity so hours stay together
+          const open=Object.values(punches).filter(p=>p.personId===editingPerson);
+          for(const p of open){await db.doc('punches/'+p.id).update({personId:uid})}
+          toast(name+': PIN changed')}
+        else toast(name+' added');
+      }
+      resetPersonForm();
+    }catch(e){console.error(e);$('pMsg').textContent='Could not save: '+(e.code||e.message)}
+    finally{$('pSave').disabled=false}
+  };
+})();
+</script>
+</body>
+</html>

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0f5c6e">
 <title>Plaza Latina Time Clock</title>
@@ -21,7 +21,9 @@
   --in:#5ccf85; --in-soft:#1b3a27; --out:#e8a65c; --out-soft:#3d2a14; --bad:#f08a7a; --bad-soft:#44201a;
   color-scheme:dark}}
 *{box-sizing:border-box}
-html,body{margin:0;min-height:100%}
+html,body{margin:0;min-height:100%;-webkit-text-size-adjust:100%}
+html{touch-action:manipulation}
+button,.pad,.dots,.who,.big,.link,.btn,.tabs{touch-action:manipulation;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
 body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;line-height:1.4;padding-inline:16px;padding-block:calc(16px + env(safe-area-inset-top,0px)) calc(32px + env(safe-area-inset-bottom,0px))}
 .wrap{max-width:480px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
 header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}

@@ -160,7 +160,8 @@ tr.tot td{font-weight:700;border-bottom:0}
       </form>
     </div>
     <div id="mgrPanel" hidden>
-      <div class="row between" style="margin-bottom:8px"><h2 style="margin:0">Manager</h2><div class="row"><button type="button" class="btn sm" id="mgrSignOut">Sign out</button><button type="button" class="btn sm" id="mgrClose">Close</button></div></div>
+      <div class="row between" style="margin-bottom:8px"><h2 style="margin:0" id="mgrTitle">Manager</h2><div class="row"><button type="button" class="btn sm" id="mgrSignOut">Sign out</button><button type="button" class="btn sm" id="mgrClose">Close</button></div></div>
+      <div class="note" id="mgrSelfNote" style="margin-bottom:10px" hidden></div>
       <div class="tabs">
         <button type="button" data-tab="hours" class="on">Hours</button>
         <button type="button" data-tab="punches">Punches</button>
@@ -207,6 +208,7 @@ tr.tot td{font-weight:700;border-bottom:0}
               <div class="field"><label for="pRole">Type</label><select id="pRole"><option value="employee">Employee</option><option value="staff">Staff</option><option value="vendor">Vendor</option></select></div>
               <div class="field"><label for="pPin">4-digit PIN</label><input type="text" id="pPin" inputmode="numeric" maxlength="4"></div>
             </div>
+            <div class="field" id="loginEmailWrap" hidden><label for="pLoginEmail">Manager sign-in email (optional)</label><input type="email" id="pLoginEmail" placeholder="Links this person to a supervisor login"></div>
             <div class="row"><button type="button" class="btn primary" id="pSave">Save</button><button type="button" class="btn" id="pCancel" hidden>Cancel</button></div>
             <div class="msg err" id="pMsg"></div>
             <div class="note" id="pHint">To change someone's PIN, edit them and enter the new PIN. Their past hours stay with their name.</div>
@@ -231,6 +233,9 @@ const firebaseConfig = {
   appId: "1:329038037167:web:80e38409407b0cb03f945a"
 };
 const MANAGER_EMAIL = "sagar.hemani@gmail.com";   // the manager account you create in Firebase Authentication
+const SUPERVISOR_EMAILS = ["ml@wazicap.com"];     // extra manager logins (Firebase Authentication users). A supervisor can do everything the
+                                                  // manager can EXCEPT touch their own punches or their own person record. Link the login to the
+                                                  // person via People → Edit → "Manager sign-in email". Keep this list in sync with firestore.rules.
 const PERIOD_ANCHOR = "2026-10-05";               // first Monday of the first two-week pay period
 const PIN_DOMAIN = "pin.plazalatina.clock";       // internal only; workers never see this
 // =================================================================================================================
@@ -244,7 +249,10 @@ const PIN_DOMAIN = "pin.plazalatina.clock";       // internal only; workers neve
   const TS=firebase.firestore.Timestamp, FV=firebase.firestore.FieldValue;
   let people={}, punches={};
   let pin='', current=null, idleTimer=null, periodOffset=0, editingId=null, editingPerson=null;
-  let unsubPeople=null, unsubPunches=null, isManager=false;
+  let unsubPeople=null, unsubPunches=null, isManager=false, isSupervisor=false, myEmail='';
+  // The signed-in supervisor's own person record (matched by loginEmail). Null for the full manager.
+  function selfPersonId(){if(!isSupervisor)return null;const me=Object.values(people).find(p=>(p.loginEmail||'').toLowerCase()===myEmail);return me?me.id:null}
+  function isSelf(pid){return !!pid&&pid===selfPersonId()}
 
   // ---------- helpers ----------
   async function sha(s){const h=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return [...new Uint8Array(h)].map(x=>x.toString(16).padStart(2,'0')).join('')}
@@ -287,9 +295,11 @@ const PIN_DOMAIN = "pin.plazalatina.clock";       // internal only; workers neve
   }
   auth.onAuthStateChanged(u=>{
     if(!u){auth.signInAnonymously().catch(e=>{console.error(e);$('padMsg').textContent='Could not connect. Check the internet connection.';$('padMsg').className='msg err'});return}
-    isManager=!!u.email&&u.email.toLowerCase()===MANAGER_EMAIL.toLowerCase();
+    myEmail=(u.email||'').toLowerCase();
+    isManager=!!myEmail&&myEmail===MANAGER_EMAIL.toLowerCase();
+    isSupervisor=!isManager&&!!myEmail&&SUPERVISOR_EMAILS.map(x=>x.toLowerCase()).includes(myEmail);
     ensureSubscriptions();
-    if(isManager){$('mgrLogin').hidden=true;$('mgrPanel').hidden=false;renderMgr()}
+    if(isManager||isSupervisor){$('mgrLogin').hidden=true;$('mgrPanel').hidden=false;renderMgr()}
     else{$('mgrPanel').hidden=true;$('mgrLogin').hidden=false}
   });
 
@@ -359,7 +369,8 @@ const PIN_DOMAIN = "pin.plazalatina.clock";       // internal only; workers neve
   $('mgrSignOut').onclick=async()=>{await auth.signOut();$('mgr').hidden=true;toast('Signed out')};
   $('mgrForm').onsubmit=async e=>{e.preventDefault();$('mgrMsg').textContent='';$('mgrSignIn').disabled=true;
     try{const r=await auth.signInWithEmailAndPassword($('mEmail').value.trim(),$('mPass').value);
-      if(!r.user.email||r.user.email.toLowerCase()!==MANAGER_EMAIL.toLowerCase()){await auth.signOut();$('mgrMsg').textContent='That account is not the manager.'}
+      const em=(r.user.email||'').toLowerCase();const ok=em===MANAGER_EMAIL.toLowerCase()||SUPERVISOR_EMAILS.map(x=>x.toLowerCase()).includes(em);
+      if(!ok){await auth.signOut();$('mgrMsg').textContent='That account is not a manager.'}
       $('mPass').value=''}
     catch(err){$('mgrMsg').textContent='Sign-in failed. Check the email and password.'}
     finally{$('mgrSignIn').disabled=false}};
@@ -376,7 +387,12 @@ const PIN_DOMAIN = "pin.plazalatina.clock";       // internal only; workers neve
     return Object.entries(rows).map(([name,r])=>({name,hours:r.hours,days:r.days.size,flags:r.flags,edits:r.edits})).sort((a,b)=>a.name.localeCompare(b.name));
   }
   function renderMgr(){
-    if(!isManager)return;
+    if(!isManager&&!isSupervisor)return;
+    const me=selfPersonId();
+    $('mgrTitle').textContent=isManager?'Manager':'Manager · '+(me&&people[me]?people[me].name:myEmail);
+    $('mgrSelfNote').hidden=!isSupervisor;
+    $('mgrSelfNote').textContent=isSupervisor?(me?'Signed in as a supervisor. You can fix anyone’s punches except your own; your own hours can only be changed by '+MANAGER_EMAIL+'.':'Signed in as a supervisor, but this login is not linked to a PIN yet. Ask '+MANAGER_EMAIL+' to set your sign-in email on your People record.'):'';
+    $('loginEmailWrap').hidden=!isManager;
     const pr=period(periodOffset);
     $('periodLbl').textContent=fmtDate(pr.startD)+' – '+fmtDate(pr.endD)+(periodOffset===0?' (current)':'');
     const tb=$('hoursTbl').querySelector('tbody');tb.innerHTML='';const sum=summarize();let tot=0;
@@ -386,14 +402,17 @@ const PIN_DOMAIN = "pin.plazalatina.clock";       // internal only; workers neve
     $('hoursNote').textContent='Open shifts count up to now. A shift still open after '+FORGOT_HOURS+' hours is treated as a missed clock-out and is not counted until fixed on the Punches tab.';
     const pb=$('punchTbl').querySelector('tbody');pb.innerHTML='';
     for(const p of periodPunches()){const tr=document.createElement('tr');const f=forgot(p);
-      tr.innerHTML='<td></td><td>'+fmtDayD(toDate(p.inAt))+'</td><td>'+fmtT(toDate(p.inAt))+'</td><td>'+(p.outAt?fmtT(toDate(p.outAt)):(f?'<span class="pill bad">missed</span>':'<span class="pill in">in</span>'))+'</td><td class="num">'+(f?'—':hrs(p).toFixed(2))+'</td><td><button type="button" class="btn sm" data-edit="'+p.id+'">Edit</button></td>';
+      const own=isSelf(p.personId);
+      tr.innerHTML='<td></td><td>'+fmtDayD(toDate(p.inAt))+'</td><td>'+fmtT(toDate(p.inAt))+'</td><td>'+(p.outAt?fmtT(toDate(p.outAt)):(f?'<span class="pill bad">missed</span>':'<span class="pill in">in</span>'))+'</td><td class="num">'+(f?'—':hrs(p).toFixed(2))+'</td><td>'+(own?'<span class="note">yours</span>':'<button type="button" class="btn sm" data-edit="'+p.id+'">Edit</button>')+'</td>';
       tr.firstChild.textContent=((people[p.personId]||{}).name||'Unknown')+(p.note?' *':'');pb.appendChild(tr)}
     if(!pb.children.length)pb.innerHTML='<tr><td colspan="6" class="empty">No punches in this period.</td></tr>';
     const pl=$('peopleList');pl.innerHTML='';
     const list=Object.values(people).filter(p=>!p.replacedBy).sort((a,b)=>a.name.localeCompare(b.name));
     if(!list.length)pl.innerHTML='<div class="empty">No one added yet. Add your employees, staff and vendors below and give each a 4-digit PIN.</div>';
-    for(const p of list){const d=document.createElement('div');d.className='person row between';d.innerHTML='<div><div class="name"></div><div class="meta">'+({vendor:'Vendor',staff:'Staff'}[p.role]||'Employee')+(p.active===false?' · inactive':'')+'</div></div><div class="row"><button type="button" class="btn sm" data-pedit="'+p.id+'">Edit</button><button type="button" class="btn sm" data-ptoggle="'+p.id+'">'+(p.active===false?'Reactivate':'Deactivate')+'</button></div>';d.querySelector('.name').textContent=p.name;pl.appendChild(d)}
-    const sel=$('editPerson');sel.innerHTML='';for(const p of list.filter(x=>x.active!==false)){const o=document.createElement('option');o.value=p.id;o.textContent=p.name;sel.appendChild(o)}
+    for(const p of list){const d=document.createElement('div');d.className='person row between';const own=isSelf(p.id);
+      d.innerHTML='<div><div class="name"></div><div class="meta">'+({vendor:'Vendor',staff:'Staff'}[p.role]||'Employee')+(p.active===false?' · inactive':'')+(p.loginEmail?' · manager login':'')+'</div></div><div class="row">'+(own?'<span class="note">you</span>':'<button type="button" class="btn sm" data-pedit="'+p.id+'">Edit</button><button type="button" class="btn sm" data-ptoggle="'+p.id+'">'+(p.active===false?'Reactivate':'Deactivate')+'</button>')+'</div>';
+      d.querySelector('.name').textContent=p.name;pl.appendChild(d)}
+    const sel=$('editPerson');sel.innerHTML='';for(const p of list.filter(x=>x.active!==false&&!isSelf(x.id))){const o=document.createElement('option');o.value=p.id;o.textContent=p.name;sel.appendChild(o)}
   }
   $('copySummary').onclick=async()=>{
     const pr=period(periodOffset);const sum=summarize();
@@ -404,7 +423,7 @@ const PIN_DOMAIN = "pin.plazalatina.clock";       // internal only; workers neve
   };
 
   // punch editing (manager)
-  $('punchTbl').addEventListener('click',e=>{const id=e.target.dataset.edit;if(!id)return;const p=punches[id];editingId=id;$('editTitle').textContent='Edit punch';$('editPersonWrap').hidden=true;$('editIn').value=toLocalInput(toDate(p.inAt));$('editOut').value=toLocalInput(toDate(p.outAt));$('editNote').value=p.note||'';$('editMsg').textContent='';$('editDelete').hidden=false;$('editDelete').textContent='Delete';$('editBox').hidden=false;$('editBox').scrollIntoView({behavior:'smooth',block:'nearest'})});
+  $('punchTbl').addEventListener('click',e=>{const id=e.target.dataset.edit;if(!id)return;const p=punches[id];if(isSelf(p.personId)){toast('You can’t edit your own punches');return}editingId=id;$('editTitle').textContent='Edit punch';$('editPersonWrap').hidden=true;$('editIn').value=toLocalInput(toDate(p.inAt));$('editOut').value=toLocalInput(toDate(p.outAt));$('editNote').value=p.note||'';$('editMsg').textContent='';$('editDelete').hidden=false;$('editDelete').textContent='Delete';$('editBox').hidden=false;$('editBox').scrollIntoView({behavior:'smooth',block:'nearest'})});
   $('addPunch').onclick=()=>{editingId=null;$('editTitle').textContent='Add a missed punch';$('editPersonWrap').hidden=false;$('editIn').value='';$('editOut').value='';$('editNote').value='';$('editMsg').textContent='';$('editDelete').hidden=true;$('editBox').hidden=false};
   $('editCancel').onclick=()=>{$('editBox').hidden=true};
   $('editSave').onclick=async()=>{
@@ -414,34 +433,41 @@ const PIN_DOMAIN = "pin.plazalatina.clock";       // internal only; workers neve
     if(!note){$('editMsg').textContent='Add a short reason so the change shows in the summary.';return}
     const data={inAt:TS.fromDate(inD),outAt:outD?TS.fromDate(outD):null,note,editedAt:FV.serverTimestamp()};
     try{
-      if(editingId)await db.doc('punches/'+editingId).update(data);
-      else{const pid=$('editPerson').value;if(!pid){$('editMsg').textContent='Pick a person.';return}await db.collection('punches').add({personId:pid,...data})}
+      if(editingId){if(isSelf((punches[editingId]||{}).personId)){$('editMsg').textContent='You can’t change your own punches.';return}await db.doc('punches/'+editingId).update(data)}
+      else{const pid=$('editPerson').value;if(!pid){$('editMsg').textContent='Pick a person.';return}if(isSelf(pid)){$('editMsg').textContent='You can’t add punches for yourself.';return}await db.collection('punches').add({personId:pid,...data})}
       $('editBox').hidden=true;toast('Punch saved')
-    }catch(e){console.error(e);$('editMsg').textContent='Could not save. Are you signed in as the manager?'}
+    }catch(e){console.error(e);$('editMsg').textContent=(e.code==='permission-denied')?'Not allowed. Managers can’t change their own punches.':'Could not save. Are you signed in as a manager?'}
   };
-  $('editDelete').onclick=async()=>{if(!editingId)return;if($('editDelete').textContent!=='Really delete?'){$('editDelete').textContent='Really delete?';return}try{await db.doc('punches/'+editingId).delete();$('editBox').hidden=true;toast('Punch deleted')}catch(e){$('editMsg').textContent='Could not delete.'}$('editDelete').textContent='Delete'};
+  $('editDelete').onclick=async()=>{if(!editingId)return;if(isSelf((punches[editingId]||{}).personId)){$('editMsg').textContent='You can’t delete your own punches.';return}if($('editDelete').textContent!=='Really delete?'){$('editDelete').textContent='Really delete?';return}try{await db.doc('punches/'+editingId).delete();$('editBox').hidden=true;toast('Punch deleted')}catch(e){$('editMsg').textContent='Could not delete.'}$('editDelete').textContent='Delete'};
 
   // people (manager). Each PIN is a hidden sign-in; creating one uses a second Firebase app so the manager stays signed in.
   const secondary=firebase.initializeApp(firebaseConfig,'secondary');const auth2=secondary.auth();
   async function createPinUser(pinValue){const c=await pinCreds(pinValue);const r=await auth2.createUserWithEmailAndPassword(c.email,c.password);const uid=r.user.uid;await auth2.signOut();return uid}
   $('peopleList').addEventListener('click',async e=>{
     const ed=e.target.dataset.pedit,tg=e.target.dataset.ptoggle;
-    if(ed){const p=people[ed];editingPerson=ed;$('pTitle').textContent='Edit '+p.name;$('pName').value=p.name;$('pRole').value=p.role||'employee';$('pPin').value='';$('pPin').placeholder='Leave blank to keep PIN';$('pCancel').hidden=false;$('pMsg').textContent='';$('pName').focus()}
-    if(tg){const p=people[tg];try{await db.doc('people/'+tg).update({active:p.active===false});toast(p.name+(p.active===false?' reactivated':' deactivated'))}catch(err){toast('Could not update')}}
+    if(ed){const p=people[ed];if(isSelf(ed)){toast('You can’t edit your own record');return}editingPerson=ed;$('pTitle').textContent='Edit '+p.name;$('pName').value=p.name;$('pRole').value=p.role||'employee';$('pLoginEmail').value=p.loginEmail||'';$('pPin').value='';$('pPin').placeholder='Leave blank to keep PIN';$('pCancel').hidden=false;$('pMsg').textContent='';$('pName').focus()}
+    if(tg){const p=people[tg];if(isSelf(tg)){toast('You can’t change your own record');return}try{await db.doc('people/'+tg).update({active:p.active===false});toast(p.name+(p.active===false?' reactivated':' deactivated'))}catch(err){toast('Could not update')}}
   });
-  function resetPersonForm(){editingPerson=null;$('pTitle').textContent='Add a person';$('pName').value='';$('pRole').value='employee';$('pPin').value='';$('pPin').placeholder='';$('pCancel').hidden=true;$('pMsg').textContent=''}
+  function resetPersonForm(){editingPerson=null;$('pTitle').textContent='Add a person';$('pName').value='';$('pRole').value='employee';$('pLoginEmail').value='';$('pPin').value='';$('pPin').placeholder='';$('pCancel').hidden=true;$('pMsg').textContent=''}
   $('pCancel').onclick=resetPersonForm;
   $('pSave').onclick=async()=>{
     const name=$('pName').value.trim(),role=$('pRole').value,pv=$('pPin').value.trim();
     if(!name){$('pMsg').textContent='Name is required.';return}
     if((!editingPerson||pv)&&!/^\d{4}$/.test(pv)){$('pMsg').textContent='PIN must be exactly 4 digits.';return}
+    if(editingPerson&&isSelf(editingPerson)){$('pMsg').textContent='You can’t change your own record.';return}
+    // loginEmail links a person to a manager/supervisor sign-in. Only the full manager may set it; a supervisor's saves keep whatever is there.
+    const prev=editingPerson?(people[editingPerson]||{}):{};
+    const loginEmail=isManager?$('pLoginEmail').value.trim().toLowerCase():(prev.loginEmail||'');
+    if(loginEmail&&!SUPERVISOR_EMAILS.map(x=>x.toLowerCase()).includes(loginEmail)){$('pMsg').textContent='That email is not in the SUPERVISOR_EMAILS list in index.html (and firestore.rules). Add it there first.';return}
+    if(!isManager&&pv&&prev.loginEmail){$('pMsg').textContent='Only '+MANAGER_EMAIL+' can change the PIN of someone with a manager login.';return}
+    const extra=loginEmail?{loginEmail}:{};
     $('pSave').disabled=true;
     try{
-      if(editingPerson&&!pv){await db.doc('people/'+editingPerson).update({name,role});toast(name+' updated')}
+      if(editingPerson&&!pv){const upd={name,role};if(isManager)upd.loginEmail=loginEmail||FV.delete();await db.doc('people/'+editingPerson).update(upd);toast(name+' updated')}
       else{
         let uid;
         try{uid=await createPinUser(pv)}catch(err){if(err.code==='auth/email-already-in-use'){$('pMsg').textContent='That PIN is already in use. Pick a different one.';return}throw err}
-        await db.doc('people/'+uid).set({name,role,active:true,createdAt:FV.serverTimestamp()});
+        await db.doc('people/'+uid).set({name,role,active:true,createdAt:FV.serverTimestamp(),...extra});
         if(editingPerson){await db.doc('people/'+editingPerson).update({active:false,replacedBy:uid});
           // move open or recent punches to the new PIN identity so hours stay together
           const open=Object.values(punches).filter(p=>p.personId===editingPerson);

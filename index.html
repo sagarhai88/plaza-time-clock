@@ -217,7 +217,7 @@ tr.tot td{font-weight:700;border-bottom:0}
       </div>
     </div>
   </section>
-  <div class="note" style="text-align:center">Pay periods: two weeks, Monday–Sunday, from <span id="anchorLbl"></span>.</div>
+  <div class="note" style="text-align:center">Pay periods: two weeks, Friday–Thursday, from <span id="anchorLbl"></span>. Hours are sent to the managers Thursday night.</div>
 </div>
 <div class="toast" id="toast"></div>
 
@@ -236,7 +236,8 @@ const MANAGER_EMAIL = "sagar.hemani@gmail.com";   // the manager account you cre
 const SUPERVISOR_EMAILS = ["ml@wazicap.com"];     // extra manager logins (Firebase Authentication users). A supervisor can do everything the
                                                   // manager can EXCEPT touch their own punches or their own person record. Link the login to the
                                                   // person via People → Edit → "Manager sign-in email". Keep this list in sync with firestore.rules.
-const PERIOD_ANCHOR = "2026-10-05";               // first Monday of the first two-week pay period
+const PERIOD_ANCHOR = "2026-10-02";               // first day (a Friday) of the first two-week pay period. Periods run Friday–Thursday;
+                                                  // hours are emailed to the managers Thursday night and payroll is submitted Friday morning.
 const PIN_DOMAIN = "pin.plazalatina.clock";       // internal only; workers never see this
 // =================================================================================================================
 
